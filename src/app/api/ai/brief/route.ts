@@ -123,12 +123,12 @@ async function generateModelBrief(data: IntelligenceSnapshot): Promise<AnalystBr
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const timeout = setTimeout(() => controller.abort(), 7_500);
   try {
-    const client = new OpenAI({ apiKey, baseURL, timeout: 20_000, maxRetries: 1 });
+    const client = new OpenAI({ apiKey, baseURL, timeout: 7_500, maxRetries: 0 });
     const response = await client.chat.completions.create({
-        model: process.env.MOBI_AI_MODEL || 'gpt-5-mini',
-        max_completion_tokens: 700,
+        model: process.env.MOBI_AI_MODEL || 'gpt-5-nano',
+        max_completion_tokens: 450,
         response_format: { type: 'json_object' },
         messages: [
           {
@@ -146,7 +146,7 @@ async function generateModelBrief(data: IntelligenceSnapshot): Promise<AnalystBr
       ...parsed,
       generatedAt: new Date().toISOString(),
       generatedBy: 'mobi-ai',
-      model: process.env.MOBI_AI_MODEL || 'gpt-5-mini',
+      model: process.env.MOBI_AI_MODEL || 'gpt-5-nano',
     };
   } catch (error) {
     console.warn('[MOBI AI] model request failed:', error instanceof Error ? error.message : 'unknown error');
