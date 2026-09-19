@@ -115,12 +115,17 @@ function compactSnapshot(data: IntelligenceSnapshot) {
 }
 
 async function generateModelBrief(data: IntelligenceSnapshot): Promise<AnalystBrief | null> {
-  if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_BASE_URL) return null;
+  const apiKey = process.env.NETLIFY_AI_GATEWAY_KEY || process.env.OPENAI_API_KEY;
+  const baseURL = process.env.NETLIFY_AI_GATEWAY_URL || process.env.OPENAI_BASE_URL;
+  if (!apiKey || !baseURL) {
+    console.warn('[MOBI AI] Netlify AI Gateway credentials are unavailable.');
+    return null;
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
   try {
-    const client = new OpenAI({ timeout: 20_000, maxRetries: 1 });
+    const client = new OpenAI({ apiKey, baseURL, timeout: 20_000, maxRetries: 1 });
     const response = await client.chat.completions.create({
         model: process.env.MOBI_AI_MODEL || 'gpt-5-mini',
         max_completion_tokens: 700,
