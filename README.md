@@ -35,7 +35,7 @@ The repository includes `netlify.toml`. Connect the GitHub repository to Netlify
 Optional environment variable:
 
 ```text
-MOBI_AI_MODEL=gpt-5
+MOBI_AI_MODEL=gpt-5-mini
 ```
 
 ## Privacy and security

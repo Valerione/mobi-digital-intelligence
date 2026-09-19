@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 import { getIntelligenceSnapshot, type IntelligenceSnapshot } from '@/lib/mobi-intelligence';
 
 export const runtime = 'nodejs';
@@ -114,19 +115,14 @@ function compactSnapshot(data: IntelligenceSnapshot) {
 }
 
 async function generateModelBrief(data: IntelligenceSnapshot): Promise<AnalystBrief | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const baseUrl = process.env.OPENAI_BASE_URL;
-  if (!apiKey || !baseUrl) return null;
+  if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_BASE_URL) return null;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
   try {
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: process.env.MOBI_AI_MODEL || 'gpt-5',
+    const client = new OpenAI({ timeout: 20_000, maxRetries: 1 });
+    const response = await client.chat.completions.create({
+        model: process.env.MOBI_AI_MODEL || 'gpt-5-mini',
         max_completion_tokens: 700,
         response_format: { type: 'json_object' },
         messages: [
@@ -136,11 +132,8 @@ async function generateModelBrief(data: IntelligenceSnapshot): Promise<AnalystBr
           },
           { role: 'user', content: JSON.stringify(compactSnapshot(data)) },
         ],
-      }),
-    });
-    if (!response.ok) return null;
-    const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = body.choices?.[0]?.message?.content;
+      }, { signal: controller.signal });
+    const raw = response.choices[0]?.message?.content;
     if (!raw) return null;
     const parsed = validateBrief(JSON.parse(raw));
     if (!parsed) return null;
@@ -148,9 +141,10 @@ async function generateModelBrief(data: IntelligenceSnapshot): Promise<AnalystBr
       ...parsed,
       generatedAt: new Date().toISOString(),
       generatedBy: 'mobi-ai',
-      model: process.env.MOBI_AI_MODEL || 'gpt-5',
+      model: process.env.MOBI_AI_MODEL || 'gpt-5-mini',
     };
-  } catch {
+  } catch (error) {
+    console.warn('[MOBI AI] model request failed:', error instanceof Error ? error.message : 'unknown error');
     return null;
   } finally {
     clearTimeout(timeout);

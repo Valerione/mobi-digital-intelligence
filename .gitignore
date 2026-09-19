@@ -63,3 +63,7 @@ scanner_backend_backup.js
 
 # Saved camera catalogue
 /.cache/
+
+# Local Netlify folder
+.netlify
+deno.lock
