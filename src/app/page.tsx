@@ -1,12 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Activity, BrainCircuit, CircleDot, Database, Globe2, Orbit,
   RefreshCw, ShieldCheck, Sparkles, TrendingUp,
 } from 'lucide-react';
-import MobiGlobe from '@/components/MobiGlobe';
 import type { IntelligenceSnapshot, MarketPoint, SourceState } from '@/lib/mobi-intelligence';
+
+const MobiGlobe = dynamic(() => import('@/components/MobiGlobe'), {
+  ssr: false,
+  loading: () => <div className="globe-loading">LOADING GEO-SPATIAL LAYER</div>,
+});
 
 interface AnalystBrief {
   summary: string;
@@ -56,6 +61,25 @@ function stateLabel(state: SourceState) {
   return state === 'live' ? 'LIVE' : state === 'stale' ? 'STALE' : 'OFFLINE';
 }
 
+function LiteGlobe({ data }: { data: IntelligenceSnapshot | null }) {
+  const entities = data ? data.earthquakes.length + data.naturalEvents.length + (data.iss ? 1 : 0) : 0;
+  return (
+    <div className="lite-globe" aria-label="Lightweight mobile global overview">
+      <div className="lite-sphere" aria-hidden="true">
+        <i className="lite-orbit orbit-one" />
+        <i className="lite-orbit orbit-two" />
+        <i className="lite-node node-rome" />
+        <i className="lite-node node-americas" />
+        <i className="lite-node node-asia" />
+      </div>
+      <div className="lite-readout">
+        <strong>{data ? `${entities} LIVE ENTITIES` : 'CONNECTING TO PUBLIC DATA'}</strong>
+        <span>{data ? `${data.earthquakes.length} SEISMIC · ${data.naturalEvents.length} NATURAL · ${data.iss ? 'ISS ACTIVE' : 'ISS WAITING'}` : 'MOBILE LOW-BANDWIDTH MODE'}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [now, setNow] = useState(new Date());
   const [data, setData] = useState<IntelligenceSnapshot | null>(null);
@@ -63,6 +87,15 @@ export default function Dashboard() {
   const [networkState, setNetworkState] = useState<'connecting' | 'online' | 'degraded'>('connecting');
   const [dataLoading, setDataLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [useLiteGlobe, setUseLiteGlobe] = useState(true);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 680px), (hover: none) and (pointer: coarse)');
+    const syncMode = () => setUseLiteGlobe(media.matches);
+    syncMode();
+    media.addEventListener?.('change', syncMode);
+    return () => media.removeEventListener?.('change', syncMode);
+  }, []);
 
   const loadIntelligence = useCallback(async () => {
     if (document.hidden) return;
@@ -207,7 +240,7 @@ export default function Dashboard() {
             <span>GEO-SPATIAL OVERVIEW / LIVE</span>
             <span>HOME NODE 41.9028° N · 12.4964° E</span>
           </div>
-          <div className="globe-frame"><MobiGlobe data={data} /></div>
+          <div className="globe-frame">{useLiteGlobe ? <LiteGlobe data={data} /> : <MobiGlobe data={data} />}</div>
           <div className="map-readout map-readout-left">ROME // MOBI.DIGITAL</div>
           <div className="map-readout map-readout-right">ORTHOGRAPHIC GRID</div>
           <div className="legend">
