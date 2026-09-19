@@ -1,61 +1,20 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    rules: {
-      'maplibre-gl.mjs': {
-        loaders: [`${__dirname}/tools/maplibre-url-loader.cjs`],
-        as: '*.js',
-      },
-    },
-  },
-  /* Standalone output exists for the Docker image — the Dockerfile copies
-     .next/standalone. Vercel builds its own artifacts and does not want it:
-     since the 16.2.6 -> 16.3.4 bump its adapter fails packaging with
-     `ENOENT .next/next-server.js.nft.json` in onBuildComplete when a
-     Turbopack build also emits standalone. The build itself compiles fine,
-     which is why this only ever shows up on a deploy. Keep standalone
-     everywhere except Vercel, so Docker and the platform both get what they
-     expect. */
-  output: process.env.VERCEL ? undefined : 'standalone',
-  serverExternalPackages: ['ws'],
-  transpilePackages: ['react-map-gl', 'mapbox-gl', 'maplibre-gl'],
-  // Type errors block the build again. They were suppressed while 17 stood
-  // unfixed; those are cleared, so the gate can do its job — the AstraPanel
-  // crash (createPortal used without an import) shipped precisely because
-  // nothing stopped it.
-  typescript: {
-    ignoreBuildErrors: false,
-  },
-  images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: '**' },
-    ],
-  },
+  typescript: { ignoreBuildErrors: false },
   async headers() {
-    return [
-      /* The worker path carries the MapLibre version, so a given URL never
-         changes contents — a version bump moves it. Next serves public/ with
-         max-age=0, which made every page load refetch half a megabyte before
-         the map could start. Immutable is safe here precisely because the
-         version is in the path. */
-      {
-        source: '/vendor/maplibre/:version/:file*',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-        ],
-      },
-      {
-        source: '/(.*)',
-        headers: [
-          { key: 'Content-Security-Policy', value: "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: wss: data: blob:;" },
-          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          { key: 'X-XSS-Protection', value: '1; mode=block' },
-        ],
-      },
-    ];
+    return [{
+      source: '/(.*)',
+      headers: [
+        { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; connect-src 'self' https:; worker-src 'self' blob:; font-src 'self' data:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'" },
+        { key: 'Referrer-Policy', value: 'no-referrer' },
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), bluetooth=()' },
+        { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+        { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      ],
+    }];
   },
 };
 
