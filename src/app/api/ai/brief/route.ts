@@ -94,9 +94,12 @@ function validateBrief(value: unknown): Omit<AnalystBrief, 'generatedAt' | 'gene
       source: String(row.source).slice(0, 80),
     }];
   });
+  const assessment: AnalystBrief['assessment'] = signals.some((signal) => signal.level === 'elevated')
+    ? 'ELEVATED'
+    : signals.some((signal) => signal.level === 'watch') ? 'WATCH' : 'NOMINAL';
   return {
     summary: item.summary.trim(),
-    assessment: item.assessment as AnalystBrief['assessment'],
+    assessment,
     confidence: Math.round(confidence),
     signals,
   };
@@ -128,20 +131,27 @@ async function generateModelBrief(data: IntelligenceSnapshot): Promise<AnalystBr
     const client = new OpenAI({ apiKey, baseURL, timeout: 7_500, maxRetries: 0 });
     const response = await client.chat.completions.create({
         model: process.env.MOBI_AI_MODEL || 'gpt-5-nano',
-        max_completion_tokens: 450,
+        max_completion_tokens: 700,
+        reasoning_effort: 'minimal',
         response_format: { type: 'json_object' },
         messages: [
           {
             role: 'system',
-            content: 'You are MOBI AI ANALYST. Analyze only the supplied public data. Never invent events, causal links, sources, or forecasts. Distinguish observation from inference. Return compact valid JSON with: summary, assessment (NOMINAL|WATCH|ELEVATED), confidence (0-100), and signals (maximum four objects with level info|watch|elevated, title, detail, source). Cite the supplied source in every signal. Keep the summary below 80 words.',
+            content: 'You are MOBI AI ANALYST. Analyze only the supplied public data. Never invent events, causal links, sources, or forecasts. Distinguish observation from inference. Return compact valid JSON with: summary, assessment (NOMINAL|WATCH|ELEVATED), confidence (0-100), and signals (maximum four objects with level info|watch|elevated, title, detail, source). Cite the supplied source in every signal. Use elevated only for earthquake magnitude >=6, absolute market movement >=5%, or Kp >=5; use watch for earthquake magnitude >=5, absolute market movement >=3%, or Kp >=4. An EONET event without supplied numeric severity is info. Assessment must equal the highest signal level. Keep the summary below 80 words.',
           },
           { role: 'user', content: JSON.stringify(compactSnapshot(data)) },
         ],
       }, { signal: controller.signal });
     const raw = response.choices[0]?.message?.content;
-    if (!raw) return null;
+    if (!raw) {
+      console.log('[MOBI AI] empty model response:', response.choices[0]?.finish_reason || 'unknown');
+      return null;
+    }
     const parsed = validateBrief(JSON.parse(raw));
-    if (!parsed) return null;
+    if (!parsed) {
+      console.log('[MOBI AI] model response failed schema validation.');
+      return null;
+    }
     return {
       ...parsed,
       generatedAt: new Date().toISOString(),
