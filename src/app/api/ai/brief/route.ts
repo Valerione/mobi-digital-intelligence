@@ -160,7 +160,7 @@ export async function GET() {
   const cacheHost = globalThis as GlobalWithBriefCache;
   if (cacheHost.__mobiBriefCache && cacheHost.__mobiBriefCache.expiresAt > Date.now()) {
     return NextResponse.json(cacheHost.__mobiBriefCache.value, {
-      headers: { 'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=3600' },
+      headers: { 'Cache-Control': 'private, no-store' },
     });
   }
 
@@ -169,7 +169,7 @@ export async function GET() {
   cacheHost.__mobiBriefCache = { value: brief, expiresAt: Date.now() + 15 * 60_000 };
   return NextResponse.json(brief, {
     headers: {
-      'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=3600',
+      'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
     },
   });
