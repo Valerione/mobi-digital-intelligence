@@ -75,7 +75,10 @@ function fallbackBrief(data: IntelligenceSnapshot): AnalystBrief {
   };
 }
 
-function validateBrief(value: unknown): Omit<AnalystBrief, 'generatedAt' | 'generatedBy' | 'model'> | null {
+function validateBrief(
+  value: unknown,
+  data: IntelligenceSnapshot,
+): Omit<AnalystBrief, 'generatedAt' | 'generatedBy' | 'model'> | null {
   if (!value || typeof value !== 'object') return null;
   const item = value as Record<string, unknown>;
   if (typeof item.summary !== 'string' || item.summary.length < 10 || item.summary.length > 900) return null;
@@ -87,8 +90,22 @@ function validateBrief(value: unknown): Omit<AnalystBrief, 'generatedAt' | 'gene
     const row = signal as Record<string, unknown>;
     if (!['info', 'watch', 'elevated'].includes(String(row.level))) return [];
     if (![row.title, row.detail, row.source].every((field) => typeof field === 'string')) return [];
+    const source = String(row.source).toUpperCase();
+    let level = row.level as SignalLevel;
+    if (source.includes('USGS')) {
+      const magnitude = Math.max(0, ...data.earthquakes.map((event) => event.magnitude));
+      level = magnitude >= 6 ? 'elevated' : magnitude >= 5 ? 'watch' : 'info';
+    } else if (source.includes('NOAA')) {
+      const kp = data.spaceWeather?.kp ?? 0;
+      level = kp >= 5 ? 'elevated' : kp >= 4 ? 'watch' : 'info';
+    } else if (source.includes('EONET') || source.includes('NASA')) {
+      level = 'info';
+    } else if (['COINGECKO', 'KRAKEN', 'FRANKFURTER', 'FX'].some((name) => source.includes(name))) {
+      const movement = Math.max(0, ...data.markets.map((market) => Math.abs(market.change ?? 0)));
+      level = movement >= 5 ? 'elevated' : movement >= 3 ? 'watch' : 'info';
+    }
     return [{
-      level: row.level as SignalLevel,
+      level,
       title: String(row.title).slice(0, 80),
       detail: String(row.detail).slice(0, 240),
       source: String(row.source).slice(0, 80),
@@ -147,7 +164,7 @@ async function generateModelBrief(data: IntelligenceSnapshot): Promise<AnalystBr
       console.log('[MOBI AI] empty model response:', response.choices[0]?.finish_reason || 'unknown');
       return null;
     }
-    const parsed = validateBrief(JSON.parse(raw));
+    const parsed = validateBrief(JSON.parse(raw), data);
     if (!parsed) {
       console.log('[MOBI AI] model response failed schema validation.');
       return null;
