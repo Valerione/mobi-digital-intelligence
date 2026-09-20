@@ -20,19 +20,23 @@ const BASEMAP_STYLE: StyleSpecification = {
     basemap: {
       type: 'raster',
       tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       ],
       tileSize: 256,
-      attribution: '© OpenStreetMap contributors © CARTO',
+      attribution: '© OpenStreetMap contributors',
     },
   },
   layers: [
     { id: 'background', type: 'background', paint: { 'background-color': '#030b11' } },
     {
       id: 'basemap', type: 'raster', source: 'basemap',
-      paint: { 'raster-opacity': 0.78, 'raster-saturation': -0.35, 'raster-contrast': 0.22 },
+      paint: {
+        'raster-opacity': 0.82,
+        'raster-saturation': -1,
+        'raster-contrast': 0.35,
+        'raster-brightness-min': 0,
+        'raster-brightness-max': 0.24,
+      },
     },
   ],
 };
