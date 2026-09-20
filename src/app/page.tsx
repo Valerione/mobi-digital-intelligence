@@ -87,11 +87,23 @@ export default function Dashboard() {
   const [networkState, setNetworkState] = useState<'connecting' | 'online' | 'degraded'>('connecting');
   const [dataLoading, setDataLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [useLiteGlobe, setUseLiteGlobe] = useState(true);
+  const [supports3D, setSupports3D] = useState(false);
+  const [use3D, setUse3D] = useState(false);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 680px), (hover: none) and (pointer: coarse)');
-    const syncMode = () => setUseLiteGlobe(media.matches);
+    const syncMode = () => {
+      let webglAvailable = false;
+      try {
+        const canvas = document.createElement('canvas');
+        webglAvailable = Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+      } catch {
+        webglAvailable = false;
+      }
+      const available = !media.matches && webglAvailable;
+      setSupports3D(available);
+      if (!available) setUse3D(false);
+    };
     syncMode();
     media.addEventListener?.('change', syncMode);
     return () => media.removeEventListener?.('change', syncMode);
@@ -240,7 +252,12 @@ export default function Dashboard() {
             <span>GEO-SPATIAL OVERVIEW / LIVE</span>
             <span>HOME NODE 41.9028° N · 12.4964° E</span>
           </div>
-          <div className="globe-frame">{useLiteGlobe ? <LiteGlobe data={data} /> : <MobiGlobe data={data} />}</div>
+          <div className="globe-frame">{use3D ? <MobiGlobe data={data} /> : <LiteGlobe data={data} />}</div>
+          {supports3D && (
+            <button className="globe-mode-button" onClick={() => setUse3D((active) => !active)}>
+              {use3D ? 'LITE GLOBE' : 'ENABLE 3D GLOBE'}
+            </button>
+          )}
           <div className="map-readout map-readout-left">ROME // MOBI.DIGITAL</div>
           <div className="map-readout map-readout-right">ORTHOGRAPHIC GRID</div>
           <div className="legend">

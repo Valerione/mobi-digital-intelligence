@@ -268,6 +268,20 @@ button { color: inherit; }
 .lite-readout { position: absolute; left: 12px; right: 12px; bottom: 10px; display: grid; gap: 5px; text-align: center; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .lite-readout strong { color: var(--cyan); font-size: 9px; letter-spacing: 0.14em; }
 .lite-readout span { color: var(--muted); font-size: 7px; letter-spacing: 0.08em; }
+.globe-mode-button {
+  position: absolute;
+  top: 30px;
+  right: 14px;
+  z-index: 7;
+  padding: 7px 9px;
+  border: 1px solid rgba(104, 222, 242, 0.28);
+  background: rgba(2, 13, 20, 0.8);
+  color: var(--cyan);
+  cursor: pointer;
+  font: 650 7px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.12em;
+}
+.globe-mode-button:hover { border-color: var(--cyan); background: rgba(8, 38, 50, 0.9); }
 .mobi-globe .maplibregl-canvas { outline: none; }
 .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { display: none; }
 .map-readout {
@@ -403,6 +417,7 @@ button { color: inherit; }
   .intelligence-feed { order: 1; min-height: 620px; }
   .analyst-panel { order: 2; min-height: 620px; }
   .stage-header span:last-child, .map-readout, .legend span:nth-child(3) { display: none; }
+  .globe-mode-button { display: none; }
   .telemetry-strip { grid-template-columns: repeat(2, 1fr); }
   .strip-label, .metric { min-height: 95px; }
   .ticker-id, .sync-state { display: none; }
