@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Map as MapLibreMap, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl';
+import { Map as MapLibreMap, setWorkerUrl, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl';
 import type { IntelligenceSnapshot } from '@/lib/mobi-intelligence';
 
 const CITIES = [
@@ -17,26 +17,20 @@ const CITIES = [
 const BASEMAP_STYLE: StyleSpecification = {
   version: 8,
   sources: {
-    basemap: {
-      type: 'raster',
-      tiles: [
-        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-      ],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
+    countries: {
+      type: 'geojson',
+      data: '/data/world-countries.geojson',
     },
   },
   layers: [
     { id: 'background', type: 'background', paint: { 'background-color': '#030b11' } },
     {
-      id: 'basemap', type: 'raster', source: 'basemap',
-      paint: {
-        'raster-opacity': 0.82,
-        'raster-saturation': -1,
-        'raster-contrast': 0.35,
-        'raster-brightness-min': 0,
-        'raster-brightness-max': 0.24,
-      },
+      id: 'countries-fill', type: 'fill', source: 'countries',
+      paint: { 'fill-color': '#0a1a22', 'fill-opacity': 0.92 },
+    },
+    {
+      id: 'countries-outline', type: 'line', source: 'countries',
+      paint: { 'line-color': '#1b5262', 'line-width': 0.65, 'line-opacity': 0.72 },
     },
   ],
 };
@@ -74,9 +68,18 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    setWorkerUrl(new URL('/maplibre-gl-worker.mjs', window.location.origin).href);
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: BASEMAP_STYLE,
+      style: {
+        ...BASEMAP_STYLE,
+        sources: {
+          countries: {
+            type: 'geojson',
+            data: new URL('/data/world-countries.geojson', window.location.origin).href,
+          },
+        },
+      },
       center: [12.4964, 23],
       zoom: 1.35,
       minZoom: 0.8,

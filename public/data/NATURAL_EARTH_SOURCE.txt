@@ -1,0 +1,3 @@
+World country boundaries are derived from Natural Earth 1:110m cultural vectors.
+Source: https://github.com/nvkelso/natural-earth-vector
+Natural Earth data is in the public domain.
