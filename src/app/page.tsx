@@ -87,8 +87,8 @@ export default function Dashboard() {
   const [networkState, setNetworkState] = useState<'connecting' | 'online' | 'degraded'>('connecting');
   const [dataLoading, setDataLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [supports3D, setSupports3D] = useState(false);
-  const [use3D, setUse3D] = useState(false);
+  const [supportsLiveMap, setSupportsLiveMap] = useState(false);
+  const [useLiveMap, setUseLiveMap] = useState(false);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 680px), (hover: none) and (pointer: coarse)');
@@ -101,8 +101,8 @@ export default function Dashboard() {
         webglAvailable = false;
       }
       const available = !media.matches && webglAvailable;
-      setSupports3D(available);
-      if (!available) setUse3D(false);
+      setSupportsLiveMap(available);
+      if (!available) setUseLiveMap(false);
     };
     syncMode();
     media.addEventListener?.('change', syncMode);
@@ -252,14 +252,14 @@ export default function Dashboard() {
             <span>GEO-SPATIAL OVERVIEW / LIVE</span>
             <span>HOME NODE 41.9028° N · 12.4964° E</span>
           </div>
-          <div className="globe-frame">{use3D ? <MobiGlobe data={data} /> : <LiteGlobe data={data} />}</div>
-          {supports3D && (
-            <button className="globe-mode-button" onClick={() => setUse3D((active) => !active)}>
-              {use3D ? 'LITE GLOBE' : 'ENABLE 3D GLOBE'}
+          <div className="globe-frame">{useLiveMap ? <MobiGlobe data={data} /> : <LiteGlobe data={data} />}</div>
+          {supportsLiveMap && (
+            <button className="globe-mode-button" onClick={() => setUseLiveMap((active) => !active)}>
+              {useLiveMap ? 'LITE GLOBE' : 'ENABLE LIVE MAP'}
             </button>
           )}
           <div className="map-readout map-readout-left">ROME // MOBI.DIGITAL</div>
-          <div className="map-readout map-readout-right">ORTHOGRAPHIC GRID</div>
+          <div className="map-readout map-readout-right">LIVE MERCATOR GRID</div>
           <div className="legend">
             <span><i className="city" /> CITY NODE</span>
             <span><i className="quake" /> EARTHQUAKE</span>

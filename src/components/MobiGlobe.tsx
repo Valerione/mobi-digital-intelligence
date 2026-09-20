@@ -57,7 +57,6 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
       attributionControl: false,
       renderWorldCopies: false,
     });
-    map.setProjection({ type: 'globe' });
     mapRef.current = map;
 
     const syncData = () => {
@@ -166,7 +165,8 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
       const elapsed = now - last;
       last = now;
       const center = map.getCenter();
-      map.setCenter([center.lng + elapsed * 0.00022, center.lat]);
+      const longitude = ((center.lng + elapsed * 0.00022 + 180) % 360) - 180;
+      map.setCenter([longitude, center.lat]);
     };
     frame = requestAnimationFrame(rotate);
 
