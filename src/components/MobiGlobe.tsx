@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Map as MapLibreMap, type GeoJSONSource } from 'maplibre-gl';
+import { Map as MapLibreMap, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl';
 import type { IntelligenceSnapshot } from '@/lib/mobi-intelligence';
 
 const CITIES = [
@@ -13,6 +13,29 @@ const CITIES = [
   ['TOKYO', 139.6917, 35.6895, 1],
   ['HONG KONG', 114.1694, 22.3193, 1],
 ] as const;
+
+const BASEMAP_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    basemap: {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+      ],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors © CARTO',
+    },
+  },
+  layers: [
+    { id: 'background', type: 'background', paint: { 'background-color': '#030b11' } },
+    {
+      id: 'basemap', type: 'raster', source: 'basemap',
+      paint: { 'raster-opacity': 0.78, 'raster-saturation': -0.35, 'raster-contrast': 0.22 },
+    },
+  ],
+};
 
 function featureCollection(features: GeoJSON.Feature[]): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features };
@@ -49,7 +72,7 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
     if (!containerRef.current || mapRef.current) return;
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: '/dark-matter-style.json',
+      style: BASEMAP_STYLE,
       center: [12.4964, 23],
       zoom: 1.35,
       minZoom: 0.8,
