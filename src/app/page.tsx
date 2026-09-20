@@ -81,7 +81,7 @@ function LiteGlobe({ data }: { data: IntelligenceSnapshot | null }) {
 }
 
 export default function Dashboard() {
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
   const [data, setData] = useState<IntelligenceSnapshot | null>(null);
   const [brief, setBrief] = useState<AnalystBrief | null>(null);
   const [networkState, setNetworkState] = useState<'connecting' | 'online' | 'degraded'>('connecting');
@@ -146,6 +146,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    const clockStart = setTimeout(() => setNow(new Date()), 0);
     const clock = setInterval(() => setNow(new Date()), 1_000);
     const startup = setTimeout(() => {
       void Promise.allSettled([loadIntelligence(), loadBrief()]);
@@ -158,6 +159,7 @@ export default function Dashboard() {
     document.addEventListener('visibilitychange', resume);
     return () => {
       clearInterval(clock);
+      clearTimeout(clockStart);
       clearTimeout(startup);
       clearInterval(dataTimer);
       clearInterval(aiTimer);
@@ -214,9 +216,9 @@ export default function Dashboard() {
         <div className="mission"><Globe2 size={14} /> GLOBAL SITUATIONAL AWARENESS <Globe2 size={14} /></div>
         <div className="clock-cluster">
           <div className={`system-pill ${networkState}`}><i /> {networkState === 'degraded' ? 'NETWORK DEGRADED' : networkState === 'connecting' ? 'CONNECTING' : 'SYSTEM ONLINE'}</div>
-          <div><small>ROME</small><strong>{clockRome.format(now)}</strong></div>
-          <div><small>UTC</small><strong>{clockUtc.format(now)}</strong></div>
-          <time>{dateRome.format(now).toUpperCase()}</time>
+          <div><small>ROME</small><strong>{now ? clockRome.format(now) : '--:--:--'}</strong></div>
+          <div><small>UTC</small><strong>{now ? clockUtc.format(now) : '--:--:--'}</strong></div>
+          <time>{now ? dateRome.format(now).toUpperCase() : 'SYNCING CLOCK'}</time>
         </div>
       </header>
 
