@@ -56,6 +56,24 @@ function flowData(): GeoJSON.FeatureCollection {
   })));
 }
 
+function flowPulseData(timestamp: number): GeoJSON.FeatureCollection {
+  const rome: [number, number] = [12.4964, 41.9028];
+  return featureCollection(CITIES.slice(1, 5).map(([, longitude, latitude], index) => {
+    const progress = ((timestamp / 6_000) + index * 0.23) % 1;
+    return {
+      type: 'Feature',
+      properties: { index },
+      geometry: {
+        type: 'Point',
+        coordinates: [
+          rome[0] + (longitude - rome[0]) * progress,
+          rome[1] + (latitude - rome[1]) * progress,
+        ],
+      },
+    };
+  }));
+}
+
 export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -118,6 +136,15 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
         id: 'flows', type: 'line', source: 'flows',
         paint: { 'line-color': '#38c9e7', 'line-width': 1, 'line-opacity': 0.32, 'line-dasharray': [2, 3] },
       });
+      map.addSource('flow-pulses', { type: 'geojson', data: flowPulseData(0) });
+      map.addLayer({
+        id: 'flow-pulse-halo', type: 'circle', source: 'flow-pulses',
+        paint: { 'circle-radius': 8, 'circle-color': '#68def2', 'circle-opacity': 0.14, 'circle-blur': 0.45 },
+      });
+      map.addLayer({
+        id: 'flow-pulses', type: 'circle', source: 'flow-pulses',
+        paint: { 'circle-radius': 2.3, 'circle-color': '#d7fbff', 'circle-stroke-color': '#52d7eb', 'circle-stroke-width': 1 },
+      });
       map.addSource('cities', { type: 'geojson', data: cityData() });
       map.addLayer({
         id: 'city-halo', type: 'circle', source: 'cities',
@@ -137,7 +164,7 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
       map.addLayer({
         id: 'city-labels', type: 'symbol', source: 'cities',
         layout: {
-          'text-field': ['get', 'name'], 'text-size': 9, 'text-offset': [0, 1.35],
+          'text-field': ['get', 'name'], 'text-size': 10, 'text-offset': [0, 1.35],
           'text-anchor': 'top', 'text-letter-spacing': 0.1, 'text-allow-overlap': false,
         },
         paint: { 'text-color': '#9ac7d2', 'text-halo-color': '#031019', 'text-halo-width': 1 },
@@ -191,9 +218,29 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
     let last = performance.now();
     const rotate = (now: number) => {
       frame = requestAnimationFrame(rotate);
-      if (!loadedRef.current || document.hidden || Date.now() < interactionUntil || now - last < 80) return;
+      if (!loadedRef.current || document.hidden || now - last < 80) return;
       const elapsed = now - last;
       last = now;
+      const softPulse = 0.5 + Math.sin(now * 0.0032) * 0.5;
+      const wave = (now % 2_200) / 2_200;
+      map.setPaintProperty('city-halo', 'circle-radius', [
+        '*', ['case', ['==', ['get', 'home'], 2], 10, 6], 0.9 + softPulse * 0.42,
+      ]);
+      map.setPaintProperty('city-halo', 'circle-opacity', 0.12 + softPulse * 0.18);
+      map.setPaintProperty('quake-halo', 'circle-radius', [
+        '*', ['interpolate', ['linear'], ['get', 'magnitude'], 4.5, 7, 7, 20], 0.85 + wave * 1.15,
+      ]);
+      map.setPaintProperty('quake-halo', 'circle-opacity', 0.34 * (1 - wave) + 0.03);
+      map.setPaintProperty('quakes', 'circle-opacity', 0.72 + softPulse * 0.28);
+      map.setPaintProperty('natural', 'circle-radius', 3.2 + softPulse * 2.4);
+      map.setPaintProperty('natural', 'circle-opacity', 0.58 + softPulse * 0.36);
+      map.setPaintProperty('iss-halo', 'circle-radius', 12 + wave * 14);
+      map.setPaintProperty('iss-halo', 'circle-opacity', 0.3 * (1 - wave) + 0.03);
+      map.setPaintProperty('flows', 'line-opacity', 0.2 + softPulse * 0.22);
+      map.setPaintProperty('flow-pulse-halo', 'circle-radius', 6 + softPulse * 5);
+      map.setPaintProperty('flow-pulse-halo', 'circle-opacity', 0.08 + softPulse * 0.18);
+      (map.getSource('flow-pulses') as GeoJSONSource | undefined)?.setData(flowPulseData(now));
+      if (Date.now() < interactionUntil) return;
       const center = map.getCenter();
       const longitude = ((center.lng + elapsed * 0.00022 + 180) % 360) - 180;
       map.setCenter([longitude, center.lat]);
