@@ -227,15 +227,23 @@ export default function Dashboard() {
           <div className="section-kicker"><span>01 / LIVE SIGNALS</span><Activity size={13} /></div>
           <h1>GLOBAL EVENTS</h1>
           <div className="rule" />
-          <div className="feed-list">
+          <div className={`feed-list ${feed.length > 2 ? 'is-scrolling' : ''}`} aria-label="Global events from public data sources">
             {!feed.length && <div className="empty-state">AWAITING VERIFIED SOURCES</div>}
-            {feed.map((item) => (
-              <article className={`feed-item ${item.tone}`} key={item.key}>
-                <div className="feed-meta"><span>{item.category}</span><time>{timeAgo(item.time)}</time></div>
-                <p>{item.title}</p>
-                <small>{item.source} · {new Date(item.time).toISOString().slice(11, 19)} UTC</small>
-              </article>
-            ))}
+            {!!feed.length && (
+              <div className="feed-track">
+                {(feed.length > 2 ? [0, 1] : [0]).map((setIndex) => (
+                  <div className="feed-set" aria-hidden={setIndex === 1 || undefined} key={setIndex}>
+                    {feed.map((item) => (
+                      <article className={`feed-item ${item.tone}`} key={`${setIndex}-${item.key}`}>
+                        <div className="feed-meta"><span>{item.category}</span><time>{timeAgo(item.time)}</time></div>
+                        <p>{item.title}</p>
+                        <small>{item.source} · {new Date(item.time).toISOString().slice(11, 19)} UTC</small>
+                      </article>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="sources-card">
             <div className="mini-title"><span>LIVE SOURCES</span><b>{liveSources}/{totalSources}</b></div>

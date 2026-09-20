@@ -176,6 +176,10 @@ button { color: inherit; }
   overflow: hidden;
   mask-image: linear-gradient(to bottom, transparent, #000 4%, #000 96%, transparent);
 }
+.feed-track { min-height: 100%; will-change: transform; }
+.feed-list.is-scrolling .feed-track { animation: feed-scroll 50s linear infinite; }
+.feed-list.is-scrolling:hover .feed-track { animation-play-state: paused; }
+.feed-set { padding: 3px 0; }
 .feed-item { padding: 13px 0 12px 10px; border-bottom: 1px solid rgba(55, 114, 134, 0.18); position: relative; }
 .feed-item::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 15px; width: 2px; background: var(--cyan); box-shadow: 0 0 8px currentColor; }
 .feed-item.amber::before { background: var(--amber); }
@@ -380,6 +384,7 @@ button { color: inherit; }
 @keyframes pulse { 0%, 100% { opacity: 0.55; transform: scale(0.86); } 50% { opacity: 1; transform: scale(1.12); } }
 @keyframes node-pulse { 0%, 100% { opacity: 0.55; transform: scale(0.82); box-shadow: 0 0 7px var(--cyan); } 50% { opacity: 1; transform: scale(1.45); box-shadow: 0 0 18px var(--cyan); } }
 @keyframes ticker { to { transform: translateX(-50%); } }
+@keyframes feed-scroll { to { transform: translateY(-50%); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
 
@@ -427,4 +432,5 @@ button { color: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  .feed-list.is-scrolling .feed-track { animation: none !important; }
 }
