@@ -29,7 +29,7 @@ interface FeedItem {
   title: string;
   source: string;
   time: string;
-  tone: 'cyan' | 'amber' | 'violet';
+  tone: 'cyan' | 'amber' | 'violet' | 'red';
 }
 
 const clockRome = new Intl.DateTimeFormat('en-GB', {
@@ -62,7 +62,7 @@ function stateLabel(state: SourceState) {
 }
 
 function LiteGlobe({ data }: { data: IntelligenceSnapshot | null }) {
-  const entities = data ? data.earthquakes.length + data.naturalEvents.length + (data.iss ? 1 : 0) : 0;
+  const entities = data ? data.earthquakes.length + data.naturalEvents.length + data.conflictSignals.length + (data.iss ? 1 : 0) : 0;
   return (
     <div className="lite-globe" aria-label="Lightweight mobile global overview">
       <div className="lite-sphere" aria-hidden="true">
@@ -74,7 +74,7 @@ function LiteGlobe({ data }: { data: IntelligenceSnapshot | null }) {
       </div>
       <div className="lite-readout">
         <strong>{data ? `${entities} LIVE ENTITIES` : 'CONNECTING TO PUBLIC DATA'}</strong>
-        <span>{data ? `${data.earthquakes.length} SEISMIC · ${data.naturalEvents.length} NATURAL · ${data.iss ? 'ISS ACTIVE' : 'ISS WAITING'}` : 'MOBILE LOW-BANDWIDTH MODE'}</span>
+        <span>{data ? `${data.earthquakes.length} SEISMIC · ${data.naturalEvents.length} NATURAL · ${data.conflictSignals.length} CONFLICT SIGNALS` : 'MOBILE LOW-BANDWIDTH MODE'}</span>
       </div>
     </div>
   );
@@ -182,6 +182,16 @@ export default function Dashboard() {
         source: 'NASA EONET', time: event.occurredAt, tone: 'violet',
       });
     }
+    for (const event of data.conflictSignals.slice(0, 4)) {
+      items.push({
+        key: `conflict-${event.id}`,
+        category: 'CONFLICT · MEDIA SIGNAL',
+        title: `${event.place} · ${event.mentions} monitored mention${event.mentions === 1 ? '' : 's'}`,
+        source: `GDELT / ${event.domain}`,
+        time: event.occurredAt,
+        tone: 'red',
+      });
+    }
     if (data.spaceWeather) {
       items.push({
         key: 'space-weather', category: 'SPACE WEATHER',
@@ -190,15 +200,16 @@ export default function Dashboard() {
         tone: data.spaceWeather.kp >= 5 ? 'amber' : 'cyan',
       });
     }
-    return items.sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 8);
+    return items.sort((a, b) => Date.parse(b.time) - Date.parse(a.time)).slice(0, 10);
   }, [data]);
 
   const liveSources = data ? Object.values(data.sources).filter((source) => source.state === 'live').length : 0;
-  const totalSources = data ? Object.keys(data.sources).length : 5;
+  const totalSources = data ? Object.keys(data.sources).length : 6;
   const ticker = [
     'MOBI.DIGITAL GLOBAL INTELLIGENCE',
     ...((data?.markets ?? []).map((market) => `${market.symbol}/USD ${formatPrice(market)}${market.change === null ? '' : ` ${market.change >= 0 ? '+' : ''}${market.change.toFixed(2)}%`}`)),
     data ? `USGS ${data.earthquakes.length} SIGNIFICANT EVENTS` : null,
+    data ? `GDELT ${data.conflictSignals.length} CONFLICT MEDIA SIGNALS` : null,
     data?.iss ? 'ISS TRACKING ACTIVE' : null,
     brief ? `MOBI AI ${brief.assessment}` : null,
     'ROME NODE ONLINE',
@@ -274,11 +285,12 @@ export default function Dashboard() {
             <span><i className="city" /> CITY NODE</span>
             <span><i className="quake" /> EARTHQUAKE</span>
             <span><i className="natural" /> NATURAL EVENT</span>
+            <span><i className="conflict" /> CONFLICT SIGNAL</span>
             <span><i className="iss" /> ISS</span>
           </div>
           <div className="stage-footer">
             <span><i className="pulse-dot" /> GLOBAL DATA FLOW</span>
-            <span>{data ? `${data.earthquakes.length + data.naturalEvents.length + (data.iss ? 1 : 0)} LIVE ENTITIES` : 'SYNCHRONIZING'}</span>
+            <span>{data ? `${data.earthquakes.length + data.naturalEvents.length + data.conflictSignals.length + (data.iss ? 1 : 0)} LIVE ENTITIES` : 'SYNCHRONIZING'}</span>
           </div>
         </section>
 
@@ -316,7 +328,7 @@ export default function Dashboard() {
       </section>
 
       <section className="telemetry-strip">
-        <div className="strip-label"><Database size={15} /><span>LIVE TELEMETRY</span><small>VERIFIED SOURCES</small></div>
+        <div className="strip-label"><Database size={15} /><span>LIVE TELEMETRY</span><small>VERIFIED + MEDIA SIGNALS</small></div>
         {(data?.markets ?? []).map((market) => (
           <div className="metric market-metric" key={market.symbol}>
             <small>{market.symbol} / USD</small>
@@ -325,6 +337,7 @@ export default function Dashboard() {
           </div>
         ))}
         <div className="metric"><small>EARTHQUAKES</small><strong>{data?.earthquakes.length ?? '—'}</strong><span>USGS M4.5+ / 24H</span></div>
+        <div className="metric conflict-metric"><small>CONFLICT RADAR</small><strong>{data?.conflictSignals.length ?? '—'}</strong><span>GDELT MEDIA SIGNALS / 24H</span></div>
         <div className="metric"><small>SPACE WEATHER</small><strong>{data?.spaceWeather ? `Kp ${data.spaceWeather.kp.toFixed(1)}` : '—'}</strong><span>{data?.spaceWeather?.level ?? 'AWAITING NOAA'}</span></div>
         <div className="metric"><small>ISS ORBIT</small><strong>{data?.iss ? `${data.iss.altitudeKm.toFixed(0)} KM` : '—'}</strong><span>{data?.iss ? `${Math.abs(data.iss.latitude).toFixed(1)}° ${data.iss.latitude >= 0 ? 'N' : 'S'}` : 'AWAITING POSITION'}</span></div>
       </section>

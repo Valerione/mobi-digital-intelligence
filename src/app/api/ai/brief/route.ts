@@ -50,6 +50,15 @@ function fallbackBrief(data: IntelligenceSnapshot): AnalystBrief {
       source: 'NOAA SWPC',
     });
   }
+  if (data.conflictSignals.length) {
+    const leading = [...data.conflictSignals].sort((a, b) => b.mentions - a.mentions)[0];
+    signals.push({
+      level: 'info',
+      title: `${data.conflictSignals.length} CONFLICT MEDIA SIGNALS`,
+      detail: `Highest monitored concentration: ${leading.place} (${leading.mentions} mentions). These are media indicators, not verified conflict events.`,
+      source: 'GDELT GKG',
+    });
+  }
   if (data.naturalEvents.length) {
     signals.push({
       level: 'info',
@@ -100,6 +109,8 @@ function validateBrief(
       level = kp >= 5 ? 'elevated' : kp >= 4 ? 'watch' : 'info';
     } else if (source.includes('EONET') || source.includes('NASA')) {
       level = 'info';
+    } else if (source.includes('GDELT')) {
+      level = 'info';
     } else if (['COINGECKO', 'KRAKEN', 'FRANKFURTER', 'FX'].some((name) => source.includes(name))) {
       const movement = Math.max(0, ...data.markets.map((market) => Math.abs(market.change ?? 0)));
       level = movement >= 5 ? 'elevated' : movement >= 3 ? 'watch' : 'info';
@@ -129,6 +140,7 @@ function compactSnapshot(data: IntelligenceSnapshot) {
     markets: data.markets,
     strongestEarthquakes: [...data.earthquakes].sort((a, b) => b.magnitude - a.magnitude).slice(0, 8),
     recentNaturalEvents: data.naturalEvents.slice(0, 8),
+    conflictMediaSignals: data.conflictSignals.slice(0, 12),
     iss: data.iss,
     spaceWeather: data.spaceWeather,
   };
@@ -154,7 +166,7 @@ async function generateModelBrief(data: IntelligenceSnapshot): Promise<AnalystBr
         messages: [
           {
             role: 'system',
-            content: 'You are MOBI AI ANALYST. Analyze only the supplied public data. Never invent events, causal links, sources, or forecasts. Distinguish observation from inference. Return compact valid JSON with: summary, assessment (NOMINAL|WATCH|ELEVATED), confidence (0-100), and signals (maximum four objects with level info|watch|elevated, title, detail, source). Cite the supplied source in every signal. Use elevated only for earthquake magnitude >=6, absolute market movement >=5%, or Kp >=5; use watch for earthquake magnitude >=5, absolute market movement >=3%, or Kp >=4. An EONET event without supplied numeric severity is info. Assessment must equal the highest signal level. Keep the summary below 80 words.',
+            content: 'You are MOBI AI ANALYST. Analyze only the supplied public data. Never invent events, causal links, sources, casualties, or forecasts. Distinguish observation from inference. Return compact valid JSON with: summary, assessment (NOMINAL|WATCH|ELEVATED), confidence (0-100), and signals (maximum four objects with level info|watch|elevated, title, detail, source). Cite the supplied source in every signal. GDELT conflictMediaSignals are media mentions near the ARMEDCONFLICT theme, not verified battlefield events: always label them as media signals and assign info level only. Use elevated only for earthquake magnitude >=6, absolute market movement >=5%, or Kp >=5; use watch for earthquake magnitude >=5, absolute market movement >=3%, or Kp >=4. An EONET event without supplied numeric severity is info. Assessment must equal the highest signal level. Keep the summary below 80 words.',
           },
           { role: 'user', content: JSON.stringify(compactSnapshot(data)) },
         ],

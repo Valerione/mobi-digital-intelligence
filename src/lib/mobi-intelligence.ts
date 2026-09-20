@@ -33,12 +33,26 @@ export interface NaturalEvent {
   occurredAt: string;
 }
 
+export interface ConflictSignal {
+  id: string;
+  latitude: number;
+  longitude: number;
+  place: string;
+  occurredAt: string;
+  domain: string;
+  url: string;
+  tone: number | null;
+  mentions: number;
+  verification: 'media-signal';
+}
+
 export interface IntelligenceSnapshot {
   generatedAt: string;
   sources: Record<string, SourceStatus>;
   markets: MarketPoint[];
   earthquakes: QuakePoint[];
   naturalEvents: NaturalEvent[];
+  conflictSignals: ConflictSignal[];
   iss: { latitude: number; longitude: number; altitudeKm: number; updatedAt: string } | null;
   spaceWeather: { kp: number; observedAt: string; level: string } | null;
 }
@@ -53,13 +67,14 @@ const SOURCE_LABELS: Record<string, string> = {
   markets: 'COINGECKO / KRAKEN + FX',
   earthquakes: 'USGS',
   naturalEvents: 'NASA EONET',
+  conflictSignals: 'GDELT GKG · MEDIA SIGNALS',
   iss: 'CELESTRAK / SGP4',
   spaceWeather: 'NOAA SWPC',
 };
 
-async function fetchJson(url: string, revalidate: number): Promise<unknown> {
+async function fetchJson(url: string, revalidate: number, timeoutMs = 8_000): Promise<unknown> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       headers: {
@@ -224,6 +239,88 @@ async function loadNaturalEvents(): Promise<NaturalEvent[]> {
   }).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 18);
 }
 
+async function loadConflictSignals(): Promise<ConflictSignal[]> {
+  const parameters = new URLSearchParams({
+    QUERY: 'ARMEDCONFLICT',
+    TIMESPAN: '1440',
+    MAXROWS: '160',
+    OUTPUTFIELDS: 'url,name,domain,tone,lang',
+  });
+  const json = await fetchJson(
+    `https://api.gdeltproject.org/api/v1/gkg_geojson?${parameters}`,
+    900,
+    18_000,
+  ) as {
+    features?: Array<{
+      geometry?: { type?: unknown; coordinates?: unknown[] };
+      properties?: {
+        urlpubtimedate?: unknown;
+        name?: unknown;
+        urltone?: unknown;
+        domain?: unknown;
+        url?: unknown;
+      };
+    }>;
+  };
+
+  const aggregated = new Map<string, ConflictSignal>();
+  for (const feature of json.features ?? []) {
+    const coordinates = feature.geometry?.coordinates;
+    const properties = feature.properties;
+    const timestamp = typeof properties?.urlpubtimedate === 'string'
+      ? Date.parse(properties.urlpubtimedate)
+      : Number.NaN;
+    if (
+      feature.geometry?.type !== 'Point'
+      || !Array.isArray(coordinates)
+      || !finite(coordinates[0])
+      || !finite(coordinates[1])
+      || !Number.isFinite(timestamp)
+    ) continue;
+
+    const longitude = coordinates[0];
+    const latitude = coordinates[1];
+    if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) continue;
+    const place = String(properties?.name ?? 'Unspecified location').trim().slice(0, 120);
+    const domain = String(properties?.domain ?? 'unknown source').trim().slice(0, 120);
+    const url = typeof properties?.url === 'string' && /^https?:\/\//.test(properties.url)
+      ? properties.url.slice(0, 1_500)
+      : '';
+    const toneValue = Number(properties?.urltone);
+    const key = `${latitude.toFixed(2)}:${longitude.toFixed(2)}:${place.toLowerCase()}`;
+    const existing = aggregated.get(key);
+    const occurredAt = new Date(timestamp).toISOString();
+    if (existing) {
+      existing.mentions += 1;
+      if (Date.parse(occurredAt) > Date.parse(existing.occurredAt)) {
+        existing.occurredAt = occurredAt;
+        existing.domain = domain;
+        existing.url = url;
+        existing.tone = Number.isFinite(toneValue) ? toneValue : null;
+      }
+      continue;
+    }
+    aggregated.set(key, {
+      id: key,
+      longitude,
+      latitude,
+      place,
+      occurredAt,
+      domain,
+      url,
+      tone: Number.isFinite(toneValue) ? toneValue : null,
+      mentions: 1,
+      verification: 'media-signal',
+    });
+  }
+
+  const result = [...aggregated.values()]
+    .sort((a, b) => b.mentions - a.mentions || Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+    .slice(0, 24);
+  if (!result.length) throw new Error('No valid conflict media signals');
+  return result;
+}
+
 async function loadIss(): Promise<IntelligenceSnapshot['iss']> {
   const json = await fetchJson('https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=JSON', 1_800) as Array<Record<string, unknown>>;
   if (!json?.[0] || Number(json[0].NORAD_CAT_ID) !== 25544) throw new Error('Invalid ISS orbit elements');
@@ -257,10 +354,11 @@ async function loadSpaceWeather(): Promise<IntelligenceSnapshot['spaceWeather']>
 }
 
 export async function getIntelligenceSnapshot(): Promise<IntelligenceSnapshot> {
-  const [markets, earthquakes, naturalEvents, iss, spaceWeather] = await Promise.all([
+  const [markets, earthquakes, naturalEvents, conflictSignals, iss, spaceWeather] = await Promise.all([
     loadSource('markets', loadMarkets),
     loadSource('earthquakes', loadEarthquakes),
     loadSource('naturalEvents', loadNaturalEvents),
+    loadSource('conflictSignals', loadConflictSignals),
     loadSource('iss', loadIss),
     loadSource('spaceWeather', loadSpaceWeather),
   ]);
@@ -271,12 +369,14 @@ export async function getIntelligenceSnapshot(): Promise<IntelligenceSnapshot> {
       markets: markets.status,
       earthquakes: earthquakes.status,
       naturalEvents: naturalEvents.status,
+      conflictSignals: conflictSignals.status,
       iss: iss.status,
       spaceWeather: spaceWeather.status,
     },
     markets: markets.data ?? [],
     earthquakes: earthquakes.data ?? [],
     naturalEvents: naturalEvents.data ?? [],
+    conflictSignals: conflictSignals.data ?? [],
     iss: iss.data,
     spaceWeather: spaceWeather.data,
   };

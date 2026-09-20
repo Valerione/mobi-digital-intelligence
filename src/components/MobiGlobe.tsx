@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Map as MapLibreMap, setWorkerUrl, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl';
+import { Map as MapLibreMap, Popup, setWorkerUrl, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl';
 import type { IntelligenceSnapshot } from '@/lib/mobi-intelligence';
 
 const CITIES = [
@@ -120,6 +120,16 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
         properties: { label: event.title, category: event.category },
         geometry: { type: 'Point', coordinates: [event.longitude, event.latitude] },
       })));
+      const conflicts = featureCollection(snapshot.conflictSignals.map((event) => ({
+        type: 'Feature',
+        properties: {
+          label: event.place,
+          domain: event.domain,
+          mentions: event.mentions,
+          occurredAt: event.occurredAt,
+        },
+        geometry: { type: 'Point', coordinates: [event.longitude, event.latitude] },
+      })));
       const iss = featureCollection(snapshot.iss ? [{
         type: 'Feature',
         properties: { label: 'ISS' },
@@ -127,6 +137,7 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
       }] : []);
       (map.getSource('quakes') as GeoJSONSource | undefined)?.setData(quakes);
       (map.getSource('natural') as GeoJSONSource | undefined)?.setData(natural);
+      (map.getSource('conflicts') as GeoJSONSource | undefined)?.setData(conflicts);
       (map.getSource('iss') as GeoJSONSource | undefined)?.setData(iss);
     };
 
@@ -191,6 +202,47 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
         id: 'natural', type: 'circle', source: 'natural',
         paint: { 'circle-radius': 3.2, 'circle-color': '#ab83ff', 'circle-opacity': 0.78, 'circle-stroke-color': '#d9c8ff', 'circle-stroke-width': 0.6 },
       });
+      map.addSource('conflicts', { type: 'geojson', data: featureCollection([]) });
+      map.addLayer({
+        id: 'conflict-halo', type: 'circle', source: 'conflicts',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['get', 'mentions'], 1, 8, 8, 18],
+          'circle-color': '#ff5f52', 'circle-opacity': 0.18, 'circle-blur': 0.5,
+        },
+      });
+      map.addLayer({
+        id: 'conflicts', type: 'circle', source: 'conflicts',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['get', 'mentions'], 1, 3.2, 8, 6.5],
+          'circle-color': '#ff715d', 'circle-opacity': 0.9,
+          'circle-stroke-color': '#ffd0c9', 'circle-stroke-width': 0.8,
+        },
+      });
+
+      const conflictPopup = new Popup({ closeButton: false, closeOnClick: false, offset: 12 });
+      map.on('mouseenter', 'conflicts', (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = event.features?.[0];
+        if (!feature || feature.geometry.type !== 'Point') return;
+        const properties = feature.properties ?? {};
+        const card = document.createElement('div');
+        card.className = 'conflict-popup';
+        const label = document.createElement('strong');
+        label.textContent = String(properties.label ?? 'Conflict media signal');
+        const status = document.createElement('span');
+        status.textContent = 'MEDIA SIGNAL · NOT VERIFIED EVENT';
+        const source = document.createElement('small');
+        source.textContent = `${properties.domain ?? 'GDELT source'} · ${properties.mentions ?? 1} mention${Number(properties.mentions ?? 1) === 1 ? '' : 's'}`;
+        card.append(label, status, source);
+        conflictPopup
+          .setLngLat(feature.geometry.coordinates as [number, number])
+          .setDOMContent(card)
+          .addTo(map);
+      });
+      map.on('mouseleave', 'conflicts', () => {
+        map.getCanvas().style.cursor = '';
+        conflictPopup.remove();
+      });
       map.addSource('iss', { type: 'geojson', data: featureCollection([]) });
       map.addLayer({
         id: 'iss-halo', type: 'circle', source: 'iss',
@@ -234,6 +286,11 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
       map.setPaintProperty('quakes', 'circle-opacity', 0.72 + softPulse * 0.28);
       map.setPaintProperty('natural', 'circle-radius', 3.2 + softPulse * 2.4);
       map.setPaintProperty('natural', 'circle-opacity', 0.58 + softPulse * 0.36);
+      map.setPaintProperty('conflict-halo', 'circle-radius', [
+        '*', ['interpolate', ['linear'], ['get', 'mentions'], 1, 8, 8, 18], 0.8 + wave * 1.3,
+      ]);
+      map.setPaintProperty('conflict-halo', 'circle-opacity', 0.38 * (1 - wave) + 0.03);
+      map.setPaintProperty('conflicts', 'circle-opacity', 0.72 + softPulse * 0.28);
       map.setPaintProperty('iss-halo', 'circle-radius', 12 + wave * 14);
       map.setPaintProperty('iss-halo', 'circle-opacity', 0.3 * (1 - wave) + 0.03);
       map.setPaintProperty('flows', 'line-opacity', 0.2 + softPulse * 0.22);
@@ -269,12 +326,19 @@ export default function MobiGlobe({ data }: { data: IntelligenceSnapshot | null 
       type: 'Feature', properties: { category: event.category },
       geometry: { type: 'Point', coordinates: [event.longitude, event.latitude] },
     })));
+    const conflicts = featureCollection(data.conflictSignals.map((event) => ({
+      type: 'Feature', properties: {
+        label: event.place, domain: event.domain, mentions: event.mentions, occurredAt: event.occurredAt,
+      },
+      geometry: { type: 'Point', coordinates: [event.longitude, event.latitude] },
+    })));
     const iss = featureCollection(data.iss ? [{
       type: 'Feature', properties: { label: 'ISS' },
       geometry: { type: 'Point', coordinates: [data.iss.longitude, data.iss.latitude] },
     }] : []);
     (map.getSource('quakes') as GeoJSONSource | undefined)?.setData(quakes);
     (map.getSource('natural') as GeoJSONSource | undefined)?.setData(natural);
+    (map.getSource('conflicts') as GeoJSONSource | undefined)?.setData(conflicts);
     (map.getSource('iss') as GeoJSONSource | undefined)?.setData(iss);
   }, [data]);
 
